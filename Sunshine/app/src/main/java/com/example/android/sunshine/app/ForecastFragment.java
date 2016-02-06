@@ -1,9 +1,11 @@
 package com.example.android.sunshine.app;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.text.format.Time;
 import android.util.Log;
@@ -60,14 +62,36 @@ public class ForecastFragment extends Fragment {
 
         int id = item.getItemId();
         if (id == R.id.action_refresh) {
-            new FetchWeatherTask().execute("94043");
+            updateWeather();
             return true;
         } else if (id == R.id.action_settings) {
             Intent intent = new Intent(getActivity(), SettingsActivity.class);
             startActivity(intent);
             return true;
+        } else if (id == R.id.action_open_location_on_map) {
+            showPreferredLocationOnMapMap();
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    public void showPreferredLocationOnMapMap() {
+
+        SharedPreferences sharedPref =
+                PreferenceManager.getDefaultSharedPreferences(getActivity());
+        String location = sharedPref
+                .getString(getString(R.string.pref_location_key),
+                        getString(R.string.pref_location_default));
+
+        Uri gmmIntentUri = Uri.parse("geo:0,0?q=" + location);
+        Intent mapIntent = new Intent(Intent.ACTION_VIEW, gmmIntentUri);
+        mapIntent.setPackage("com.google.android.apps.maps");
+        if (mapIntent.resolveActivity(getActivity().getPackageManager()) != null) {
+            startActivity(mapIntent);
+        } else {
+            Toast.makeText(
+                    getActivity(),
+                    getString(R.string.show_on_map_fail), Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override
@@ -96,15 +120,25 @@ public class ForecastFragment extends Fragment {
             }
         });
 
-
-        new FetchWeatherTask().execute("94043");
         return rootView;
     }
 
-    public class FetchWeatherTask extends AsyncTask<String, Void, List<String>> {
+    private void updateWeather() {
+        //getActivity().getSharedPreferences(getString(R.string.pref_file_key), Context.MODE_PRIVATE);
+
+        new FetchWeatherTask().execute();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        updateWeather();
+    }
+
+    public class FetchWeatherTask extends AsyncTask<Void, Void, List<String>> {
 
         @Override
-        protected List<String> doInBackground(String... strings) {
+        protected List<String> doInBackground(Void... voids) {
 
             // These two need to be declared outside the try/catch
             // so that they can be closed in the finally block.
@@ -113,6 +147,16 @@ public class ForecastFragment extends Fragment {
 
             // Will contain the raw JSON response as a string.
             String forecastJsonStr = null;
+
+            SharedPreferences sharedPref =
+                    PreferenceManager.getDefaultSharedPreferences(getActivity());
+            String location = sharedPref
+                    .getString(getString(R.string.pref_location_key),
+                            getString(R.string.pref_location_default));
+
+            String units = sharedPref
+                    .getString(getString(R.string.pref_units_key),
+                            getString(R.string.pref_units_default));
 
             try {
                 // Construct the URL for the OpenWeatherMap query
@@ -127,8 +171,8 @@ public class ForecastFragment extends Fragment {
                         .appendPath("2.5")
                         .appendPath("forecast")
                         .appendPath("daily")
-                        .appendQueryParameter("zip", strings[0])
-                        .appendQueryParameter("units", "metric")
+                        .appendQueryParameter("zip", location)
+                        .appendQueryParameter("units", units)
                         .appendQueryParameter("cnt", "7")
                         .appendQueryParameter("appid", "83e0ad6f028b317a7edcdc7242239700");
 
@@ -300,6 +344,4 @@ public class ForecastFragment extends Fragment {
 
         }
     }
-
-
 }
